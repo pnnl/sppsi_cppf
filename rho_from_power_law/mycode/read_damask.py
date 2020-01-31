@@ -46,6 +46,8 @@ for i in range(12):
         sin_nb[i, j] = (1.0 - cos_nb[i, j] ** 2) ** 0.5
         if sin_nb[i, j] < 0.0:
             print("sin_nb[%i, %i] < 0.0" % (i, j))
+            
+# print(cos_nt, cos_nb, sin_nt, sin_nb)
         
 
 class Dislocation:
@@ -60,7 +62,6 @@ class Dislocation:
                  folder contains damask results"""
         self.idir = idir
         self.nslip = 12 # 12 slip systems for aluminum
-        self.post_process()
         
         # number of grids in three axes, int
         self.nx = 0
@@ -110,7 +111,7 @@ class Dislocation:
         # used to compute SSD rate, critical distance for dipole formation
         self.poisson_ratio = 0.334 # from https://www.engineeringtoolbox.com/poissons-ratio-d_1224.html
         
-        self.temperature = 293.0 # in K
+        self.temperature = 600.0 # in K
         self.kb = 1.38e-23 # J K-1, Boltzmann constant, from ref(3)
         # eq 24 in ref(3), or eq(9, 10) in ref(2)
         iB = 2.0 * self.kb / (self.c1 * self.c2 * self.c3 * self.shear_modulus * self.burger ** 3)
@@ -138,24 +139,30 @@ class Dislocation:
         self.gndet_dot = np.zeros((self.nslip, self.nxyz))
         self.ssd_dot = np.zeros((self.nslip, self.nxyz))
         
-    def post_process(self):
+        self.nsteps = 20
+        
+    def post_process_rho(self):
         """ Post process DAMASK results"""
-        mkdir = "mkdir %s/postProc_rho" % self.idir
-        os.system(mkdir)
+        # create folder to contain results
+        if "postProc_rho" not in os.listdir(self.idir):
+            mkdir = "mkdir %s/postProc_rho" % self.idir
+            os.system(mkdir)
         
-        # output shear rate, resolved shear stress, deformation gradient, 1st PK stress
-        post_results = "postResults --time --co shearrate_slip,resolvedstress_slip --cr f,p --separation x,y,z --split " + \
-                       "--range 0 2 1 -d postProc_rho *.spectralOut"
-        os.system("cd %s && %s" % (self.idir, post_results))
-        
-        # add results to txt table
-        # result txt file
-        txt = "%s/postProc_rho/*.txt" % (self.idir)
-        
-        # add gradient of shear rates
-        for i in range(self.nslip):
-            gradient = "addGradient --label %i_shearrate_slip %s" % ((i + 1), txt)
-            os.system(gradient)
+        # omit time 0
+        for i in range(1, self.nsteps):
+            # output shear rate, resolved shear stress, deformation gradient, 1st PK stress
+            post_results = "postResults --time --co shearrate_slip,resolvedstress_slip --cr f,p --separation x,y,z --split " + \
+                           "--range %i %i 1 -d postProc_rho *.spectralOut" % (i, i)
+            os.system("cd %s && %s" % (self.idir, post_results))
+            
+            # add shear rate gradient to txt table
+            # result txt file
+            txt = "%s/postProc_rho/*inc%i.txt" % (self.idir, i)
+            
+            # add gradient of shear rates
+            for j in range(self.nslip):
+                gradient = "addGradient --label %i_shearrate_slip %s" % ((j + 1), txt)
+                os.system(gradient)
             
     def init_load(self):
         """ Read load file to get dt"""
@@ -170,14 +177,15 @@ class Dislocation:
         # at this point, assume just one line in load file
         with open(load_file, "r") as f:
             for i, line in enumerate(f):
-                split_line = line.split()
-                for j in range(len(split_line)):
-                    if split_line[j] == "time":
-                        time = float(split_line[j + 1])
-                    if split_line[j] == "incs":
-                        incs = float(split_line[j + 1])
-                        self.dt = time / incs
-                        return
+                if i == 0:
+                    split_line = line.split()
+                    for j in range(len(split_line)):
+                        if split_line[j] == "time":
+                            time = float(split_line[j + 1])
+                        if split_line[j] == "incs":
+                            incs = float(split_line[j + 1])
+                            self.dt = time / incs
+                            return
             
     def init_nxyz(self):
         """ Read number of grids in three axes from the geom file.
@@ -347,16 +355,20 @@ class Dislocation:
     
     def update_ssd_dot(self):
         """ calculate rate of SSN dislocation density
-            follow eq(7) in ref1 and eq(24) in ref3.     
+            follow eq(7) in ref1 and eq(24) in ref3.   
         """
         term1 = self.c4 * self.forest ** 0.5 * self.gamma_dot
         
         # term 2
         tau_pass = self.calculate_tau_pass(self.parallel)
+        
+#         d_dipole = 3.0 ** 0.5 * self.shear_modulus * self.burger \
+#                     / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau
+
         d_dipole = np.zeros((self.nslip, self.nxyz))
         for i in range(self.nslip):
             for j in range(self.nxyz):
-                if abs(self.tau[i, j]) >= tau_pass[i, j]:
+                if abs(self.tau[i, j]) >= tau_pass[i, j]: # TO DO: CHECK THIS
                     d_dipole[i, j] = 3.0 ** 0.5 * self.shear_modulus * self.burger \
                     / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau[i, j]
         
@@ -388,6 +400,11 @@ class Dislocation:
                 self.forest[i] += self.ssd[j] * cos_nt[i, j] + \
                                   np.absolute(self.gnds[j] * cos_nb[i, j]) + \
                                   np.absolute(self.gndet[j] * cos_nt[i, j])
+                                  
+#         for i in range(self.nslip):
+#             for j in range(self.nxyz):
+#                 if self.forest[i, j] < 0.0:
+#                     print("At %i, %i, forest = %.6e" % (i, j, self.forest[i, j]))
     
     def update_parallel(self):
         """ Update parallel dislocation density following eq(5) in ref1
@@ -399,6 +416,11 @@ class Dislocation:
                 self.parallel[i] += self.ssd[j] * sin_nt[i, j] + \
                                   np.absolute(self.gnds[j] * sin_nb[i, j]) + \
                                   np.absolute(self.gndet[j] * sin_nt[i, j])
+                                  
+#         for i in range(self.nslip):
+#             for j in range(self.nxyz):
+#                 if self.parallel[i, j] < 0.0:
+#                     print("At %i, %i, parallel = %.6e" % (i, j, self.parallel[i, j]))
     
     def time_integrator(self, v0, rate, dt):
         """ Compute v1 as
@@ -415,11 +437,13 @@ class Dislocation:
         # form the txt files in the sequence of increment
         # the three processed steps for testing
         txts = []
-        for i in range(3):
+        
+        for i in range(self.nsteps):
+            # three digits filled with 0
             txt = self.idir + "/postProc_rho/" + "5grain_16grid1_power_inc%i.txt" % i
             txts.append(txt)
         
-        for i in range(3):
+        for i in range(1, self.nsteps):
             print("Process incs %i" % i)
             txt = txts[i]
             
@@ -437,6 +461,18 @@ class Dislocation:
             self.gnds = self.time_integrator(self.gnds, self.gnds_dot, self.dt)
             self.gndet = self.time_integrator(self.gndet, self.gndet_dot, self.dt)
             
+#             for i in range(self.nslip):
+#                 for j in range(self.nxyz):
+#                     if self.gnds[i, j] < 0.0:
+#                         print("At %i, %i, GNDs = %.6e" % (i, j, self.gnds[i, j]))
+#                     if self.gndet[i, j] < 0.0:
+#                         print("At %i, %i, GNDet = %.6e" % (i, j, self.gndet[i, j]))
+            
+            # calculate GND
+            gnd = (self.gnds ** 2 + self.gndet ** 2) ** .5
+            np.savetxt(self.idir + "/postProc_rho/gnd_inc%i.txt" % i, gnd)
+            print("Sum of GND is %.6e" % np.sum(gnd))
+            
             # use the updated GNDs and GNDet to update parallel and forest
             # i.e., parallel and forest at half step
             self.update_forest()
@@ -448,44 +484,53 @@ class Dislocation:
             self.update_ssd_dot()
             
             # update ssd
-            self.ssd = self.time_integrator(self.ssd, self.ssd_dot, self.dt)
+            self.ssd = np.absolute(self.time_integrator(self.ssd, self.ssd_dot, self.dt))
+            for i in range(self.nslip):
+                for j in range(self.nxyz):
+                    if self.ssd[i, j] < 0.0:
+                        print("At %i, %i, SSD = %.6e" % (i, j, self.ssd[i, j]))
+            np.savetxt(self.idir + "/postProc_rho/ssd_inc%i.txt" % i, self.ssd)
+            print("Sum of SSD is %.6e" % (np.sum(self.ssd)))
             
             # update parallel and forest
             self.update_forest()
             np.savetxt(self.idir + "/postProc_rho/forest_inc%i.txt" % i, self.forest)
             self.update_parallel()
             np.savetxt(self.idir + "/postProc_rho/parallel_inc%i.txt" % i, self.parallel)
+            mobile = self.calculate_mobile(self.parallel, self.forest)
+            np.savetxt(self.idir + "/postProc_rho/mobile_inc%i.txt" % i, mobile)
 
 # give the folder of damask results, auto. process all the results
 idir = "./power"
-# a = Dislocation(idir)
-# a.solver()
+a = Dislocation(idir)
+# a.post_process_rho()
+a.solver()
 
-dirname = "./power/postProc_rho"
-for i in range(3):
-    forest = np.loadtxt(dirname + "/forest_inc%i.txt" % i)
-    parallel = np.loadtxt(dirname + "/parallel_inc%i.txt" % i)
-    
-    # sum over 12 slip systems
-    sforest = np.zeros(len(forest[0]))
-    sparallel = np.zeros(len(parallel[0]))
-    for j in range(len(forest)):
-        sforest += forest[j]
-        sparallel += parallel[j]
-        
-    plt.figure()
-    plt.imshow(np.reshape(sforest[0 : 16 * 16], (16, 16)), aspect = 'auto')
-    plt.colorbar()
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.savefig("forest_inc%i.png" % i)
-    
-    plt.figure()
-    plt.imshow(np.reshape(sparallel[0 : 16 * 16], (16, 16)), aspect = 'auto')
-    plt.colorbar()
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.savefig("parallel_inc%i.png" % i)
+# dirname = "./power/postProc_rho"
+# for i in range(3):
+#     forest = np.loadtxt(dirname + "/forest_inc%i.txt" % i)
+#     parallel = np.loadtxt(dirname + "/parallel_inc%i.txt" % i)
+#      
+#     # sum over 12 slip systems
+#     sforest = np.zeros(len(forest[0]))
+#     sparallel = np.zeros(len(parallel[0]))
+#     for j in range(len(forest)):
+#         sforest += forest[j]
+#         sparallel += parallel[j]
+#          
+#     plt.figure()
+#     plt.imshow(np.reshape(sforest[0 : 16 * 16], (16, 16)), aspect = 'auto')
+#     plt.colorbar()
+#     plt.xlabel("x")
+#     plt.ylabel("y")
+#     plt.savefig("forest_inc%i2.png" % i)
+#      
+#     plt.figure()
+#     plt.imshow(np.reshape(sparallel[0 : 16 * 16], (16, 16)), aspect = 'auto')
+#     plt.colorbar()
+#     plt.xlabel("x")
+#     plt.ylabel("y")
+#     plt.savefig("parallel_inc%i2.png" % i)
 
 
 
