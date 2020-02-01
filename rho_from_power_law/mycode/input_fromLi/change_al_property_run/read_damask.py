@@ -197,7 +197,7 @@ class Dislocation:
         # find the geom file
         files = os.listdir(self.idir)
         for i in files:
-            if ".geom" in i:
+            if "input_clean.geom" in i:
                 geom_file = i
                 break
         
@@ -223,7 +223,7 @@ class Dislocation:
         # find the geom file
         files = os.listdir(self.idir)
         for i in files:
-            if ".geom" in i:
+            if "input_clean.geom" in i:
                 geom_file = i
                 break
         
