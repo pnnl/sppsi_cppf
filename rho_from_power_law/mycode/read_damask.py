@@ -362,15 +362,15 @@ class Dislocation:
         # term 2
         tau_pass = self.calculate_tau_pass(self.parallel)
         
-#         d_dipole = 3.0 ** 0.5 * self.shear_modulus * self.burger \
-#                     / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau
+        d_dipole = 3.0 ** 0.5 * self.shear_modulus * self.burger \
+                    / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau
 
-        d_dipole = np.zeros((self.nslip, self.nxyz))
-        for i in range(self.nslip):
-            for j in range(self.nxyz):
-                if abs(self.tau[i, j]) >= tau_pass[i, j]: # TO DO: CHECK THIS
-                    d_dipole[i, j] = 3.0 ** 0.5 * self.shear_modulus * self.burger \
-                    / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau[i, j]
+#         d_dipole = np.zeros((self.nslip, self.nxyz))
+#         for i in range(self.nslip):
+#             for j in range(self.nxyz):
+#                 if abs(self.tau[i, j]) >= tau_pass[i, j]: # TO DO: CHECK THIS
+#                     d_dipole[i, j] = 3.0 ** 0.5 * self.shear_modulus * self.burger \
+#                     / 16.0 / np.pi / (1.0 - self.poisson_ratio) / self.tau[i, j]
         
         mobile = self.calculate_mobile(self.parallel, self.forest)
         term2 = self.c6 * d_dipole * mobile * self.gamma_dot

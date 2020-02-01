@@ -1,0 +1,39 @@
+#!/bin/csh
+#SBATCH -t 2:59:00
+#SBATCH -A sppsi    
+#SBATCH -N 1
+#SBATCH -p short
+
+################## PICK MODULES AND PARAMETERS  #####################
+    module purge
+    module load intel/15.0.1
+    module load  mvapich2/2.1a
+
+    setenv MKL_NUM_THREADS 1
+    set MY_CORES_PER_NODE=16
+
+# The following do not change
+    setenv OMP_NUM_THREADS 1
+    limit stacksize unlimited
+    set MY_DIR=${PWD}
+#### THIS is for Constance with 24 cores per node
+       if (${MKL_NUM_THREADS} == "1")  setenv MV2_CPU_MAPPING '0:1:2:3:4:5:6:7:8:9:10:11:12:13:14:15:16:17:18:19:20:21:22:23'
+       if (${MKL_NUM_THREADS} == "2")  setenv MV2_CPU_MAPPING '0,1:2,3:4,5:6,7:8,9:10,11:12,13:14,15:16,17:18,19:20,21:22,23'
+       if (${MKL_NUM_THREADS} == "3")  setenv MV2_CPU_MAPPING '0,1,2:3,4,5:6,7,8:9,10,11:12,13,14:15,16,17:18,19,20:21,22,23'
+       if (${MKL_NUM_THREADS} == "4")  setenv MV2_CPU_MAPPING '0,1,2,3:4,5,6,7:8,9,10,11:12,13,14,15:16,17,18,19:20,21,22,23'
+       if (${MKL_NUM_THREADS} == "8")  setenv MV2_CPU_MAPPING '0,1,2,3,4,5,6,7:8,9,10,11,12,13,14,15:16,17,18,19,20,21,22,23'
+       if (${MKL_NUM_THREADS} == "16") setenv MV2_ENABLE_AFFINITY 0  # Turn off binding
+       if (${MKL_NUM_THREADS} == "24") setenv MV2_ENABLE_AFFINITY 0  # Turn off binding
+       @ MY_TASKS_PER_NODE = ${MY_CORES_PER_NODE} / ${MKL_NUM_THREADS}
+       if ( ${MY_TASKS_PER_NODE} == "0") set MY_TASKS_PER_NODE=1 # Must be doing 32 way MKL
+       @ MY_TASKS = ${MY_TASKS_PER_NODE} * ${SLURM_JOB_NUM_NODES}
+
+       unset MY_TASKS_PER_NODE
+###### Run the job #########################################
+echo Running all out with file buffering
+date
+setenv GMON_OUT_PREFIX gmon.out
+srun -N ${SLURM_JOB_NUM_NODES}  -n ${MY_TASKS} /people/d3y238/spp/fcc_dislocation1.x
+date
+
+ 

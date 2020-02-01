@@ -1,0 +1,22 @@
+#!/bin/csh
+#SBATCH -t 1:00:00
+#SBATCH -A sppsi
+#SBATCH -N 1
+############### BUILD THE CODE ########################
+    ####### find MKL in a way that will continue to work with newer MKL versions
+    module purge
+    module load intel/15.0.1
+    module load  mvapich2/2.1a
+
+       set MY_CODE=/qfs/projects/sppsi/wkfu/rho_from_power_law/mycode/
+       set MY_IFORT=`which ifort`
+       set MY_INTEL=${MY_IFORT:h:h:h}
+       set MKL_LIB=${MY_INTEL}/mkl/lib/intel64/
+       unset MY_IFORT
+    ####### This requires this *.a file to map fftw to MKL
+       cd ${MY_INTEL}/mkl/interfaces/fftw3x_cdft
+       make libintel64 mpi=mpich2 compiler=intel interface=lp64 INSTALL_DIR=${MY_CODE}
+    ##### Compile the code and copy to job directory
+       cd ${MY_CODE}
+       mpif90 -lpmi  fcc_dislocation1.f90 -O3 -ipo -xHost -heap-arrays0 -shared-intel -mcmodel=medium -no-prec-div -align zcommons,array32byte -o fcc_dislocation1.x -extend-source -fpconstant -Wl,--start-group ${MKL_LIB}/libmkl_intel_lp64.a ${MKL_LIB}/libmkl_intel_thread.a ${MKL_LIB}/libmkl_core.a ${MKL_LIB}/libmkl_cdft_core.a ${MKL_LIB}/libmkl_blacs_intelmpi_lp64.a ./libfftw3x_cdft_lp64.a -Wl,--end-group -liomp5 -assume buffered_stdout,buffered_io 
+
