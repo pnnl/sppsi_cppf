@@ -73,15 +73,16 @@ origin x 0.0 y 0.0 z 0.0
 homogenization 1
 """
     for i in range(len(id)):
-        s += "%i " % id[i]
+        # first determine start a new line or not
         if i % ngrid == 0 and i > 0:
             s += "\n"
+        s += "%i " % id[i]
     
-    with open("input.geom", "w") as f:
+    with open("input_clean.geom", "w") as f:
         f.write(s)
     
 
-mat_generator()
+# mat_generator()
 geom_generator()
 
 
