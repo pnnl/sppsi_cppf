@@ -522,13 +522,6 @@ class Dislocation:
             time_inc = time.time() - time_inc
             print("Inc %i used %2f s" % (i, time_inc))
 
-# give the folder of damask results, auto. process all the results
-# idir = sys.argv[1]
-# incs = int(sys.argv[2])
-# a = Dislocation(idir)
-# a.post_process(incs)
-# a.solver()
-
 # dirname = "./power/postProc_rho"
 # for i in range(3):
 #     forest = np.loadtxt(dirname + "/forest_inc%i.txt" % i)
