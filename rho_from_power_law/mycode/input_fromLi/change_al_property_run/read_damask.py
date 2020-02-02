@@ -460,12 +460,12 @@ class Dislocation:
         gnd_list = []
         ssd_list= []
         
-        for i in range(1, 101):
+        for i in range(1, 201):
             print("Process incs %i" % i)
             time_inc = time.time()
             # locate txt file
             for j in files:
-                if "law_inc%i.txt" % i in j:
+                if "power_inc%i.txt" % i in j:
                     txt = self.idir + "/postProc_rho/" + j
                     break
             
