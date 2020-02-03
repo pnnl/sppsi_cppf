@@ -111,7 +111,7 @@ class Dislocation:
         # used to compute SSD rate, critical distance for dipole formation
         self.poisson_ratio = 0.334 # from https://www.engineeringtoolbox.com/poissons-ratio-d_1224.html
         
-        self.temperature = 293.0 # in K
+        self.temperature = 473.0 # in K
         self.kb = 1.38e-23 # J K-1, Boltzmann constant, from ref(3)
         # eq 24 in ref(3), or eq(9, 10) in ref(2)
         iB = 2.0 * self.kb / (self.c1 * self.c2 * self.c3 * self.shear_modulus * self.burger ** 3)
