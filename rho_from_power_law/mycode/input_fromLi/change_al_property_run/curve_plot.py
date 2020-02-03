@@ -19,25 +19,51 @@ def read_column(afile, label):
 
 markers = ['b-', 'g--', 'r-.*', 'y:', 'm-', 'c--', 'k-.']
 
-laws = ['isotropic', 'power', 'nonlocal']
 prefile = "pressure_shear/postProc/input_power.txt"
 tfile = "uniaxial_tensile2/postProc/input_power.txt"
 
+# fdot * 1e-3 0   1e-3 0 0   0 0 0   stress -2e7 * *   * * *   * * *   time 200  incs 200 freq 1
 pstrain = read_column(prefile, "2_ln(V)")
 pstress = read_column(prefile, "2_Cauchy")
+
+# print final strain
+print("Pressure load, final strain 12 = %.2f" % pstrain[-1])
+
+# stored in txts are the sum of dislocation densities in 64^3 grids
+# divided by 64**3 to compute averaged rho
+ssd = np.loadtxt("pressure_shear/postProc_rho/ssd_sum.txt") / 64 ** 3
+gnd = np.loadtxt("pressure_shear/postProc_rho/gnd_sum.txt") / 64 ** 3
 plt.figure()
-plt.plot(pstrain, pstress * 1e-6, "k-")
+plt.plot(pstrain, pstress * 1e-6, "k-", label = "stress")
 plt.xlabel("Strain 12")
 plt.ylabel("Cauchy stress 12 (MPa)")
-plt.grid(1)
+plt.legend(loc = 0)
+plt.twinx()
+plt.plot(pstrain[1 : ], ssd, "b--", label = "SSD")
+plt.plot(pstrain[1 : ], gnd, "g--", label = "GND")
+plt.ylabel("Dislo. density (m$^{-2}$)")
+plt.yscale("log")
+plt.legend(loc = "lower left", bbox_to_anchor = (0.5, .005))
 plt.savefig("ss_shear.png")
 
 # fdot 1e-3 0 0  * * 0  * * *   stress * * *   0 0 *   0 0 0   time 200  incs 200 freq 1
 pstrain = read_column(tfile, "1_ln(V)")
 pstress = read_column(tfile, "1_Cauchy")
+ssd = np.loadtxt("uniaxial_tensile2/postProc_rho/ssd_sum.txt") / 64 ** 3
+gnd = np.loadtxt("uniaxial_tensile2/postProc_rho/gnd_sum.txt") / 64 ** 3
+
+# print final strain
+print("Tensile load, final strain 11 = %.2f" % pstrain[-1])
+
 plt.figure()
-plt.plot(pstrain, pstress * 1e-6, "k-")
+plt.plot(pstrain, pstress * 1e-6, "k-", label = "stress")
 plt.xlabel("Strain 11")
 plt.ylabel("Cauchy stress 11 (MPa)")
-plt.grid(1)
+plt.legend(loc = 0)
+plt.twinx()
+plt.plot(pstrain[1 : ], ssd, "b--", label = "SSD")
+plt.plot(pstrain[1 : ], gnd, "g--", label = "GND")
+plt.ylabel("Dislo. density (m$^{-2}$)")
+plt.yscale("log")
+plt.legend(loc = "lower left", bbox_to_anchor = (0.5, .005))
 plt.savefig("ss_tensile.png")
